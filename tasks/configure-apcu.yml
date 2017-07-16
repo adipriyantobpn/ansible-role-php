@@ -10,7 +10,7 @@
   file:
     path: "{{ item.1.path }}"
     state: absent
-  when: php_apc_conf_filename != (item.1.path.split('/') | last)
+  when: not php_enable_apc and php_apc_conf_filename != (item.1.path.split('/') | last ) and 'ini' == (item.1.path.split('.') | last )
   with_subelements:
     - "{{ php_installed_apc_confs.results }}"
     - files
@@ -24,14 +24,30 @@
     group: root
     force: yes
     mode: 0644
+    backup: yes
   with_items: "{{ php_extension_conf_paths }}"
   when: php_enable_apc
   notify: restart webserver
 
+- name: Ensure APCu Backwards Compatibility Module config file is present.
+  template:
+    src: apc-bc.ini.j2
+    dest: "{{ item }}/{{ php_apc_bc_conf_filename }}"
+    owner: root
+    group: root
+    force: yes
+    mode: 0644
+    backup: yes
+  with_items: "{{ php_extension_conf_paths }}"
+  when: php_enable_apc and php_apc_bc_conf_filename is defined and php_apc_bc_conf_filename | length > 0
+  notify: restart webserver
+
 - name: Remove APCu config file if APC is disabled.
   file:
-    path: "{{ item }}/{{ php_apc_conf_filename }}"
+    path: "{{ item.1.path }}"
     state: absent
-  with_items: "{{ php_extension_conf_paths }}"
-  when: not php_enable_apc
+  when: not php_enable_apc and php_apc_conf_filename == (item.1.path.split('/') | last ) and 'ini' == (item.1.path.split('.') | last )
+  with_subelements:
+    - "{{ php_installed_apc_confs.results }}"
+    - files
   notify: restart webserver
